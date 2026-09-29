@@ -1,0 +1,146 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Custom F1C200s board with an MPU-6050 IMU on I2C0.
+ *
+ * Pin conventions (see myboard/README.md in the source tree root):
+ *   UART1 console: PA2 (TX), PA3 (RX), 115200n8
+ *   I2C0:          PD12 (SCL), PD0 (SDA), MPU-6050 at 0x68 (AD0 = GND)
+ *   MPU-6050 INT:  PE2 (GPIO bank E = 4, EINT bank 1)
+ *   LCD (ILI9341): SPI1 PE7 (CS), PE8 (MOSI), PE9 (CLK);
+ *                  DC = PE4, RESET = PE5, backlight = PWM0 on PE12
+ *   Storage:       SPI0 NAND on PC0-PC3, TF card on mmc0 (PF0-PF5)
+ *   USB OTG:       peripheral (also used for FEL boot/download)
+ *
+ * Note: an RGB parallel panel would monopolize the whole PD bank
+ * (including the I2C0 pins) and mainline has no suniv TCON/DE driver,
+ * hence the SPI panel on the otherwise unused PE bank.
+ */
+
+/dts-v1/;
+#include "suniv-f1c100s.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+/ {
+	model = "MyBoard F1C200s";
+	compatible = "myvendor,myboard-f1c200s", "allwinner,suniv-f1c200s",
+		     "allwinner,suniv-f1c100s";
+
+	aliases {
+		serial0 = &uart1;
+		i2c0 = &i2c0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	reg_vcc3v3: regulator-3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+
+	backlight: backlight {
+		compatible = "pwm-backlight";
+		/* PWM0 channel 0, 25 kHz period */
+		pwms = <&pwm 0 40000 0>;
+		brightness-levels = <0 16 32 64 96 128 192 255>;
+		default-brightness-level = <6>;
+		power-supply = <&reg_vcc3v3>;
+	};
+};
+
+&pio {
+	spi1_pe_pins: spi1-pe-pins {
+		/* write-only panel: CS/MOSI/CLK, MISO (PE10) left free */
+		pins = "PE7", "PE8", "PE9";
+		function = "spi1";
+	};
+
+	pwm0_pe_pin: pwm0-pe-pin {
+		pins = "PE12";
+		function = "pwm0";
+	};
+};
+
+&pwm {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm0_pe_pin>;
+	status = "okay";
+};
+
+&spi1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi1_pe_pins>;
+	status = "okay";
+
+	display@0 {
+		/* 2.4" 240x320 ILI9341 module (drivers/gpu/drm/tiny/ili9341.c) */
+		compatible = "adafruit,yx240qv29";
+		reg = <0>;
+		spi-max-frequency = <32000000>;
+		dc-gpios = <&pio 4 4 GPIO_ACTIVE_HIGH>;	/* PE4 */
+		reset-gpios = <&pio 4 5 GPIO_ACTIVE_HIGH>;	/* PE5 */
+		backlight = <&backlight>;
+		rotation = <270>;	/* landscape 320x240 */
+	};
+};
+
+&i2c0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c0_pd_pins>;
+	status = "okay";
+
+	imu@68 {
+		compatible = "invensense,mpu6050";
+		reg = <0x68>;
+		interrupt-parent = <&pio>;
+		/* PE2: <bank pin flags>, bank E = 4 */
+		interrupts = <4 2 IRQ_TYPE_EDGE_RISING>;
+		vdd-supply = <&reg_vcc3v3>;
+		vddio-supply = <&reg_vcc3v3>;
+	};
+};
+
+&mmc0 {
+	broken-cd;
+	bus-width = <4>;
+	disable-wp;
+	vmmc-supply = <&reg_vcc3v3>;
+	status = "okay";
+};
+
+&otg_sram {
+	status = "okay";
+};
+
+&spi0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi0_pc_pins>;
+	status = "okay";
+
+	flash@0 {
+		compatible = "spi-nand";
+		reg = <0>;
+		spi-max-frequency = <40000000>;
+	};
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_pa_pins>;
+	status = "okay";
+};
+
+&usb_otg {
+	dr_mode = "peripheral";
+	status = "okay";
+};
+
+&usbphy {
+	status = "okay";
+};
