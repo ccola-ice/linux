@@ -15,7 +15,7 @@
 ## 构建
 
 ```sh
-# 针对本源码树（默认，需先在树内完成过一次内核构建以生成 Module.symvers）
+# QEMU 里的 bzImage 是 v7.2-rc7，默认 KDIR 指向匹配的 worktree
 make
 
 # 交叉编译到目标板（ARM 内核构建目录）
@@ -23,6 +23,37 @@ make KDIR=/path/to/linux/build-arm ARCH=arm CROSS_COMPILE=arm-linux-gnueabi-
 ```
 
 本模块只依赖 I2C/regmap/IIO 通用 API，无平台相关代码，x86 与 ARM 均可编译。
+不要用 `make KDIR=/home/zhangb/linux` 编给这份 QEMU 内核：源码树已经前移，
+`struct module` 大小对不上。
+
+## QEMU（无真实芯片）
+
+x86 guest 没有 MPU-6050。`myram/run-qemu.sh` 会加载 `i2c-stub`（地址 0x68），
+写入 `WHO_AM_I=0x68` 后再 `new_device` 绑定本驱动。
+
+```sh
+cd /home/zhangb/linux/mympu6050 && make
+cd /home/zhangb/linux/myram
+./mkinitramfs.sh "$PWD/myram.ko" "$PWD/../mympu6050/mympu6050.ko"
+./run-qemu.sh
+```
+
+之后改 `mympu6050.c` 不必重打包：
+
+```sh
+make                          # 宿主 mympu6050/
+# guest:
+rmmod mympu6050
+insmod /mnt/mpu/mympu6050.ko
+bind-mpu                      # 仅 insmod 不会出现 iio:device；要绑定 0x68
+```
+
+guest 里核对：
+
+```sh
+cat /sys/bus/iio/devices/iio:device0/name
+cat /sys/bus/iio/devices/iio:device0/in_accel_z_raw   # stub 预置为 16384
+```
 
 ## 目标板上使用
 

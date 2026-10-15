@@ -6,8 +6,8 @@
 #   不传任何 -drive  guest 看不到宿主的任何块设备
 #   initramfs 根     不需要磁盘镜像、不需要 mount、不需要 loop
 #
-# -virtfs 把本目录以只读 9p 挂进 guest 的 /mnt/host，用来热加载新编的
-# myram.ko。这不是块设备直通，guest 写不了宿主文件。
+# -virtfs 把 myram/ 和 mympu6050/ 只读挂进 guest，用来热加载新编的 .ko。
+# 这不是块设备直通，guest 写不了宿主文件。
 #
 # 退出虚拟机：Ctrl-A 然后按 X
 set -euo pipefail
@@ -40,5 +40,6 @@ exec qemu-system-x86_64 \
 	-m 2G -smp 1 \
 	-net none \
 	-virtfs local,path="$HERE",mount_tag=hostshare,security_model=none,readonly=on \
+	-virtfs local,path="$TREE/mympu6050",mount_tag=mpushare,security_model=none,readonly=on \
 	-nographic \
 	-no-reboot

@@ -11,7 +11,7 @@ against that same kernel, not this live git tree:
 
 ```sh
 make
-./mkinitramfs.sh "$PWD/myram.ko"   # 首次，或改了 init 脚本时
+./mkinitramfs.sh "$PWD/myram.ko" "$PWD/../mympu6050/mympu6050.ko"
 ./run-qemu.sh
 ```
 

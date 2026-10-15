@@ -1,11 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0
 obj-m += mympu6050.o
 
-# Build against this source tree by default (module uses IIO/regmap APIs
-# of the tree, not necessarily the running kernel):
-#   make            # KDIR defaults to the parent tree
-#   make KDIR=/lib/modules/$(uname -r)/build
-KDIR ?= $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+# QEMU guest bzImage is v7.2-rc7 (2026-08-13). Do not use the live parent
+# tree: same vermagic / different sizeof(struct module). ARM 板级编译覆盖 KDIR。
+KDIR ?= $(HOME)/linux-v7.2-rc7
 PWD  := $(shell pwd)
 
 all:
