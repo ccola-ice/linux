@@ -6,16 +6,35 @@ DISCARD/WRITE_ZEROES release fully covered pages.
 
 ## Build
 
-Against this kernel tree:
-
-```sh
-make -C /home/zhangb/linux M="$PWD" modules
-```
-
-Against the running kernel (needs matching headers):
+QEMU loads `arch/x86/boot/bzImage` from 2026-08-13 (`7.2.0-rc7`). Compile
+against that same kernel, not this live git tree:
 
 ```sh
 make
+./mkinitramfs.sh "$PWD/myram.ko"   # 首次，或改了 init 脚本时
+./run-qemu.sh
+```
+
+QEMU 把本目录只读 9p 挂到 guest 的 `/mnt/host`。之后改 `myram.c` 不必重打包、不必重启：
+
+```sh
+make          # 宿主
+# guest:
+rmmod myram
+insmod /mnt/host/myram.ko
+```
+
+`~/linux-v7.2-rc7` is a `v7.2-rc7` git worktree plus the original build
+artifacts (`Module.symvers`, `include/generated`, `scripts/mod/modpost`).
+Building with `make -C /home/zhangb/linux M=$PWD` picks newer
+`include/linux/module.h` while `utsrelease.h` is still `7.2.0-rc7`, so
+`insmod` fails with a `struct module` size mismatch.
+
+Against the running host kernel (needs matching headers; do not load a
+7.2 module into the 6.8 host):
+
+```sh
+make KDIR=/lib/modules/$(uname -r)/build
 ```
 
 ## Load / unload
@@ -63,17 +82,14 @@ sudo umount /mnt/myram
 sudo rmmod myram
 ```
 
-Only load into a kernel built from the same source tree (or ABI-compatible
-headers). Loading a 7.2-built module into another running kernel will fail
-with `Invalid module format` unless versions match.
-
-On this development host the running kernel is currently 6.8, while the module
-is built for 7.2, so it can be compiled here but must be runtime-tested after
-booting the matching kernel.
+Load only into the kernel that produced the headers you compiled against.
+The 6.8 host cannot load this module. Test in QEMU (`./run-qemu.sh`).
+`vermagic` matching is not enough: `sizeof(struct module)` must match too.
 
 ## Files
 
 - `myram.c` — driver (tag set, gendisk, `.queue_rq`)
 - `Makefile` — out-of-tree kbuild
+- `mkinitramfs.sh` / `run-qemu.sh` — guest image and virtfs 9p share
 
 See also [../linux-block-driver-framework.md](../linux-block-driver-framework.md).

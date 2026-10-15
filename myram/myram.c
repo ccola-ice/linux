@@ -286,15 +286,21 @@ static int __init myram_init(void)
 	if (myram_size_mb == 0)
 		return -EINVAL;
 
-	if (myram_blocksize != 512 && myram_blocksize != 4096)
+	if (myram_blocksize != 512 && myram_blocksize != 4096) {
+		pr_err("myram: blocksize must be 512 or 4096, got %u\n",
+		       myram_blocksize);
 		return -EINVAL;
+	}
 
 	if (myram_size_mb > (SIZE_MAX >> 20))
 		return -EOVERFLOW;
 
 	size = (size_t)myram_size_mb << 20;
-	if (size < myram_blocksize || !IS_ALIGNED(size, myram_blocksize))
+	if (size < myram_blocksize || !IS_ALIGNED(size, myram_blocksize)) {
+		pr_err("myram: size %u MiB is not aligned to blocksize %u\n",
+		       myram_size_mb, myram_blocksize);
 		return -EINVAL;
+	}
 
 	myram_dev = kzalloc(sizeof(*myram_dev), GFP_KERNEL);
 	if (!myram_dev)
@@ -354,6 +360,7 @@ static int __init myram_init(void)
 	return 0;
 
 fail:
+	pr_err("myram: init failed, err=%d\n", ret);
 	myram_cleanup();
 	return ret;
 }
